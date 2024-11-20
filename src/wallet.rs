@@ -25,6 +25,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::marker::PhantomData;
 use std::ops::{AddAssign, Deref};
 
+use amplify::Getters;
 use bpstd::{
     Address, AddressNetwork, DerivedAddr, Descriptor, Idx, IdxBase, Keychain, Network, NormalIndex,
     Outpoint, Sats, Txid, Vout,
@@ -251,7 +252,9 @@ impl WalletData<Layer2Empty> {
 
 impl<L2: Layer2Data> WalletData<L2> {
     pub fn new_layer2() -> Self
-    where L2: Default {
+    where
+        L2: Default,
+    {
         WalletData {
             persistence: None,
             id: None,
@@ -320,14 +323,14 @@ impl<L2C: Layer2Cache> WalletCache<L2C> {
         }
     }
 
-    pub fn with<I: Indexer, K, D: Descriptor<K>, L2: Layer2<Cache = L2C>>(
+    pub fn with<I: Indexer, K, D: Descriptor<K>, L2: Layer2<Cache=L2C>>(
         descriptor: &WalletDescr<K, D, L2::Descr>,
         indexer: &I,
     ) -> MayError<Self, Vec<I::Error>> {
         indexer.create::<K, D, L2>(descriptor)
     }
 
-    pub fn update<I: Indexer, K, D: Descriptor<K>, L2: Layer2<Cache = L2C>>(
+    pub fn update<I: Indexer, K, D: Descriptor<K>, L2: Layer2<Cache=L2C>>(
         &mut self,
         descriptor: &WalletDescr<K, D, L2::Descr>,
         indexer: &I,
@@ -372,7 +375,7 @@ impl<L2C: Layer2Cache> WalletCache<L2C> {
         })
     }
 
-    pub fn txos(&self) -> impl Iterator<Item = WalletUtxo> + '_ {
+    pub fn txos(&self) -> impl Iterator<Item=WalletUtxo> + '_ {
         self.tx.iter().flat_map(|(txid, tx)| {
             tx.outputs.iter().enumerate().filter_map(|(vout, out)| {
                 if let Party::Wallet(w) = out.beneficiary {
@@ -389,7 +392,7 @@ impl<L2C: Layer2Cache> WalletCache<L2C> {
         })
     }
 
-    pub fn utxos(&self) -> impl Iterator<Item = WalletUtxo> + '_ {
+    pub fn utxos(&self) -> impl Iterator<Item=WalletUtxo> + '_ {
         self.utxo.iter().map(|outpoint| {
             let tx = self.tx.get(&outpoint.txid).expect("cache data inconsistency");
             let debit = tx.outputs.get(outpoint.vout_usize()).expect("cache data inconsistency");
@@ -444,7 +447,7 @@ impl<L2: Layer2Cache> Drop for WalletCache<L2> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Getters)]
 pub struct Wallet<K, D: Descriptor<K>, L2: Layer2 = NoLayer2> {
     descr: WalletDescr<K, D, L2::Descr>,
     data: WalletData<L2::Data>,
@@ -503,6 +506,10 @@ impl<K, D: Descriptor<K>> Wallet<K, D> {
             layer2: none!(),
         }
     }
+
+    pub fn detach(self) -> (WalletDescr<K, D>, WalletData<Layer2Empty>, WalletCache<Layer2Empty>) {
+        (self.descr, self.data, self.cache)
+    }
 }
 
 impl<K, D: Descriptor<K>, L2: Layer2> Wallet<K, D, L2> {
@@ -511,6 +518,15 @@ impl<K, D: Descriptor<K>, L2: Layer2> Wallet<K, D, L2> {
             cache: WalletCache::new_nonsync(),
             data: WalletData::new_layer2(),
             descr: WalletDescr::new_layer2(descr, l2_descr, network),
+            layer2,
+        }
+    }
+
+    pub fn restore(descr: WalletDescr<K, D, L2::Descr>, data: WalletData<L2::Data>, cache: WalletCache<L2::Cache>, layer2: L2) -> Self {
+        Self {
+            descr,
+            data,
+            cache,
             layer2,
         }
     }
@@ -588,7 +604,7 @@ impl<K, D: Descriptor<K>, L2: Layer2> Wallet<K, D, L2> {
     pub fn transactions(&self) -> &BTreeMap<Txid, WalletTx> { &self.cache.tx }
 
     #[inline]
-    pub fn coins(&self) -> impl Iterator<Item = CoinRow<<L2::Cache as Layer2Cache>::Coin>> + '_ {
+    pub fn coins(&self) -> impl Iterator<Item=CoinRow<<L2::Cache as Layer2Cache>::Coin>> + '_ {
         self.cache.coins()
     }
 
@@ -602,12 +618,12 @@ impl<K, D: Descriptor<K>, L2: Layer2> Wallet<K, D, L2> {
         })
     }
 
-    pub fn address_balance(&self) -> impl Iterator<Item = WalletAddr> + '_ {
+    pub fn address_balance(&self) -> impl Iterator<Item=WalletAddr> + '_ {
         self.cache.addr.values().flat_map(|set| set.iter()).copied()
     }
 
     #[inline]
-    pub fn history(&self) -> impl Iterator<Item = TxRow<<L2::Cache as Layer2Cache>::Tx>> + '_ {
+    pub fn history(&self) -> impl Iterator<Item=TxRow<<L2::Cache as Layer2Cache>::Tx>> + '_ {
         self.cache.history()
     }
 
@@ -618,14 +634,14 @@ impl<K, D: Descriptor<K>, L2: Layer2> Wallet<K, D, L2> {
         self.cache.outpoint_by(outpoint)
     }
 
-    pub fn txos(&self) -> impl Iterator<Item = WalletUtxo> + '_ { self.cache.txos() }
-    pub fn utxos(&self) -> impl Iterator<Item = WalletUtxo> + '_ { self.cache.utxos() }
+    pub fn txos(&self) -> impl Iterator<Item=WalletUtxo> + '_ { self.cache.txos() }
+    pub fn utxos(&self) -> impl Iterator<Item=WalletUtxo> + '_ { self.cache.utxos() }
 
     pub fn coinselect<'a>(
         &'a self,
         up_to: Sats,
         selector: impl Fn(&WalletUtxo) -> bool + 'a,
-    ) -> impl Iterator<Item = Outpoint> + '_ {
+    ) -> impl Iterator<Item=Outpoint> + '_ {
         let mut selected = Sats::ZERO;
         self.utxos()
             .filter(selector)
@@ -643,12 +659,14 @@ impl<K, D: Descriptor<K>, L2: Layer2> Wallet<K, D, L2> {
 
 impl<K, D: Descriptor<K>, L2: Layer2> Wallet<K, D, L2> {
     pub fn load<P>(provider: P, autosave: bool) -> Result<Wallet<K, D, L2>, PersistenceError>
-    where P: Clone
-            + PersistenceProvider<WalletDescr<K, D, L2::Descr>>
-            + PersistenceProvider<WalletData<L2::Data>>
-            + PersistenceProvider<WalletCache<L2::Cache>>
-            + PersistenceProvider<L2>
-            + 'static {
+    where
+        P: Clone
+        + PersistenceProvider<WalletDescr<K, D, L2::Descr>>
+        + PersistenceProvider<WalletData<L2::Data>>
+        + PersistenceProvider<WalletCache<L2::Cache>>
+        + PersistenceProvider<L2>
+        + 'static,
+    {
         let descr = WalletDescr::<K, D, L2::Descr>::load(provider.clone(), autosave)?;
         let data = WalletData::<L2::Data>::load(provider.clone(), autosave)?;
         let cache = WalletCache::<L2::Cache>::load(provider.clone(), autosave)?;
@@ -674,11 +692,11 @@ impl<K, D: Descriptor<K>, L2: Layer2> Wallet<K, D, L2> {
     ) -> Result<bool, PersistenceError>
     where
         P: Clone
-            + PersistenceProvider<WalletDescr<K, D, L2::Descr>>
-            + PersistenceProvider<WalletData<L2::Data>>
-            + PersistenceProvider<WalletCache<L2::Cache>>
-            + PersistenceProvider<L2>
-            + 'static,
+        + PersistenceProvider<WalletDescr<K, D, L2::Descr>>
+        + PersistenceProvider<WalletData<L2::Data>>
+        + PersistenceProvider<WalletCache<L2::Cache>>
+        + PersistenceProvider<L2>
+        + 'static,
     {
         let a = self.descr.make_persistent(provider.clone(), autosave)?;
         let b = self.data.make_persistent(provider.clone(), autosave)?;
