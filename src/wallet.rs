@@ -456,7 +456,7 @@ impl<L2: Layer2Cache> Drop for WalletCache<L2> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Getters)]
 pub struct Wallet<K, D: Descriptor<K>, L2: Layer2 = NoLayer2> {
     descr: WalletDescr<K, D, L2::Descr>,
     data: WalletData<L2::Data>,
@@ -515,8 +515,12 @@ impl<K, D: Descriptor<K>> Wallet<K, D> {
             layer2: none!(),
         }
     }
+
     pub fn data_l1(&self) -> &WalletData<Layer2Empty> { &self.data }
     pub fn cache_l1(&self) -> &WalletCache<Layer2Empty> { &self.cache }
+    pub fn detach(self) -> (WalletDescr<K, D>, WalletData<Layer2Empty>, WalletCache<Layer2Empty>) {
+        (self.descr, self.data, self.cache)
+    }
 }
 
 impl<K, D: Descriptor<K>, L2: Layer2> Wallet<K, D, L2> {
@@ -525,6 +529,20 @@ impl<K, D: Descriptor<K>, L2: Layer2> Wallet<K, D, L2> {
             cache: WalletCache::new_nonsync(),
             data: WalletData::new_layer2(),
             descr: WalletDescr::new_layer2(descr, l2_descr, network),
+            layer2,
+        }
+    }
+
+    pub fn restore(
+        descr: WalletDescr<K, D, L2::Descr>,
+        data: WalletData<L2::Data>,
+        cache: WalletCache<L2::Cache>,
+        layer2: L2,
+    ) -> Self {
+        Self {
+            descr,
+            data,
+            cache,
             layer2,
         }
     }
