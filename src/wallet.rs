@@ -316,7 +316,7 @@ pub struct WalletCache<L2: Layer2Cache> {
 }
 
 impl<L2C: Layer2Cache> WalletCache<L2C> {
-    pub(crate) fn new_nonsync() -> Self {
+    pub fn new_nonsync() -> Self {
         WalletCache {
             persistence: None,
             id: None,
