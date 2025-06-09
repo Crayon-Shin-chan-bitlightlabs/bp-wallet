@@ -49,6 +49,8 @@ pub enum NonWalletItem {
     NoOutput(Txid, Vout),
     /// transaction output {0} doesn't belong to the wallet.
     NonWalletUtxo(Outpoint),
+    /// transaction output {0} is spent.Add commentMore actions
+    Spent(Outpoint),
 }
 
 pub struct AddrIter<'descr, K, D: Descriptor<K>> {
@@ -447,7 +449,9 @@ impl<L2C: Layer2Cache> WalletCache<L2C> {
             .get(outpoint.vout.into_usize())
             .ok_or(NonWalletItem::NoOutput(outpoint.txid, outpoint.vout))?;
         let terminal = debit.derived_addr().ok_or(NonWalletItem::NonWalletUtxo(outpoint))?.terminal;
-        // TODO: Check whether TXO is spend
+        if debit.spent.is_some() {
+            return Err(NonWalletItem::Spent(outpoint));
+        }
         let utxo = WalletUtxo {
             outpoint,
             value: debit.value,
