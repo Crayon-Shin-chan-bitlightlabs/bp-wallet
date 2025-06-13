@@ -612,6 +612,26 @@ impl<K, D: Descriptor<K>, L2: Layer2> Wallet<K, D, L2> {
         }
     }
 
+    pub fn detach(
+        self,
+    ) -> (WalletDescr<K, D, L2::Descr>, WalletData<L2::Data>, WalletCache<L2::Cache>) {
+        (self.descr, self.data, self.cache)
+    }
+
+    pub fn restore(
+        descr: WalletDescr<K, D, L2::Descr>,
+        data: WalletData<L2::Data>,
+        cache: WalletCache<L2::Cache>,
+        layer2: L2,
+    ) -> Self {
+        Self {
+            descr,
+            data,
+            cache,
+            layer2,
+        }
+    }
+
     pub fn set_name(&mut self, name: String) {
         self.data.name = name;
         self.data.mark_dirty();
