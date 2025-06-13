@@ -536,7 +536,7 @@ impl<L2: Layer2Cache> Drop for WalletCache<L2> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Getters)]
 pub struct Wallet<K, D: Descriptor<K>, L2: Layer2 = NoLayer2> {
     descr: WalletDescr<K, D, L2::Descr>,
     data: WalletData<L2::Data>,
