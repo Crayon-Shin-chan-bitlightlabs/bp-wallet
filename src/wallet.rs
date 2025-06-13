@@ -317,6 +317,10 @@ pub struct WalletCache<L2: Layer2Cache> {
     pub layer2: L2,
 }
 
+impl<L2C: Layer2Cache> Default for WalletCache<L2C> {
+    fn default() -> Self { Self::new_nonsync() }
+}
+
 impl<L2C: Layer2Cache> WalletCache<L2C> {
     pub fn new_nonsync() -> Self {
         WalletCache {
