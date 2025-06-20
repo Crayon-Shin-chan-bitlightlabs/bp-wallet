@@ -456,6 +456,7 @@ impl<L2C: Layer2Cache> WalletCache<L2C> {
         if debit.spent.is_some() {
             return Err(NonWalletItem::Spent(outpoint));
         }
+        debug_assert!(self.is_unspent(outpoint));
         let utxo = WalletUtxo {
             outpoint,
             value: debit.value,
@@ -486,17 +487,20 @@ impl<L2C: Layer2Cache> WalletCache<L2C> {
     }
 
     pub fn utxos(&self) -> impl Iterator<Item = WalletUtxo> + '_ {
-        self.utxo.iter().map(|outpoint| {
+        self.utxo.iter().flat_map(|outpoint| {
             let tx = self.tx.get(&outpoint.txid).expect("cache data inconsistency");
             let debit = tx.outputs.get(outpoint.vout_usize()).expect("cache data inconsistency");
             let terminal =
                 debit.derived_addr().expect("UTXO doesn't belong to the wallet").terminal;
-            // TODO: Check whether TXO is spend
-            WalletUtxo {
-                outpoint: *outpoint,
-                value: debit.value,
-                terminal,
-                status: tx.status,
+            if debit.spent.is_some() {
+                None
+            } else {
+                Some(WalletUtxo {
+                    outpoint: *outpoint,
+                    value: debit.value,
+                    terminal,
+                    status: tx.status,
+                })
             }
         })
     }
